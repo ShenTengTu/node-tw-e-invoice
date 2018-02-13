@@ -1,5 +1,5 @@
 {
-  "name": "tw-e-invoice",
+  "name": "node-tw-e-invoice",
   "version": "1.0.0",
   "description": "Node.js framework of Taiwan e-invoice API. 台灣電子發票API的Node.js框架。",
   "main": "lib/index.js",

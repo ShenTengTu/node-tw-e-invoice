@@ -1,4 +1,5 @@
-const endPoint: string = 'https://api.einvoice.nat.gov.tw/';
+import * as querystring from 'querystring';
+const endPoint: string = 'https://api.einvoice.nat.gov.tw';
 
 /**
  * `TaiwanEInvoice` is a class that wraps Taiwan e-invoice API.
@@ -15,15 +16,15 @@ export class TaiwanEInvoice {
   /**
   *UUID,universally unique identifier of inquirer
   */
-  uuID:string;
+  uuID:string = '';
   /**
   *txID,Transaction ID of inquirer
   */
-  txID:string;
+  txID:string = '';
   /**
   * inquirer's identity.
   */
-  identity:InquirerIdentity;
+  identity:InquirerIdentity = InquirerIdentity.Common;
   /**
   * Constructor
   * @param appID App ID,apply from [MOF E-Invoice platform](https://www.einvoice.nat.gov.tw/APMEMBERVAN/APIService/Registration).
@@ -36,10 +37,10 @@ export class TaiwanEInvoice {
   }
   /**
   * Tell API the UUID or the txID of the inquirer.
-  * @param identity inquirer's identity.
   * @param id UUID or txID .
+  * @param identity inquirer's identity. Default is `InquirerIdentity.Common` . (Optional)
   */
-  inquirer(identity:InquirerIdentity,id:string):TaiwanEInvoice{
+  inquirer(id:string,identity?:InquirerIdentity):TaiwanEInvoice{
     switch(identity){
       case InquirerIdentity.Common :
         this.identity = identity;
@@ -50,31 +51,47 @@ export class TaiwanEInvoice {
         this.txID = id;
         break;
       default :
-       throw new Error(`Invalid inquirer identity.`);
+        this.uuID = id;
+        if(identity !== undefined)
+          throw new Error(`Invalid inquirer identity.`);
     }
     return this;
   }
   /**
   *
   * @param action request parameter `action` literal specified in the API
-  * @param parameters other request parameters specified in the API
+  * @param param other request parameters specified in the API
   */
-  action(action:string,params:any){
-    let actions:any = (()=>{
-      switch(this.identity){
-        case InquirerIdentity.Common :
-          return RequestCommonAction;
-        case InquirerIdentity.BusinessEntity:
-         return RequestBusinessuAction;
-        default :
-          return undefined;
-      }
-    })();
+  action(action:string,param:{}){
+    if(typeof param !== 'object')
+      throw new Error('param must be specified an plain object.');
 
-    if(actions  === undefined)
-      throw new Error(`Undefined request actions with invalid inquirer identity.`);
-    if(actions[action] === undefined)
+    let actions:any = undefined;
+    let configs:APIRequest.ConfigStruct[]|undefined = undefined;
+    switch(this.identity){
+      case InquirerIdentity.Common :
+        actions = RequestCommonAction;//real object at runtime
+        configs = APIRequest.CommonConfigs;
+        break;
+      case InquirerIdentity.BusinessEntity:
+        actions = RequestBusinessuAction;//real object at runtime
+        configs = APIRequest.BusinessConfigs;
+        break;
+      default :
+        throw new Error(`Invalid inquirer identity.`);
+    }
+
+    let actionIndex = actions[action];
+    if(actionIndex === undefined)
       throw new Error(`Invalid request action '${action}'`);
+
+    let config:APIRequest.ConfigStruct = configs[actionIndex];
+    config.endPoint = config.endPoint || endPoint;
+    let paramters = { ...param, ...config.stableParam};
+    paramters.appID = this.appID;
+    paramters.UUID = this.uuID;
+    let url = `${config.endPoint}${config.path}?${querystring.stringify(paramters)}`
+    console.log(config.method,url);
   }
 }
 /**
@@ -183,4 +200,225 @@ enum RequestBusinessuAction{
   * Query whether is business entity.
   */
   qryBanUnitTp
+}
+/**
+* Inner module.Define default request config with the API spec .
+*/
+namespace APIRequest {
+  /**
+  * Enumerate HTTP request methods.
+  */
+  export enum Method {
+    GET = 'GET',
+    POST = 'POST'
+  }
+  /**
+  * Define default request config structure.
+  */
+  export interface ConfigStruct {
+    /**
+    * API HTTP Endpoint. It must be specified in `BusinessConfigs` . (Optional)
+    */
+    endPoint?:string;
+    /**
+    * HTTP request path of the API.
+    */
+    path:string;
+    /**
+    * HTTP request method.
+    */
+    method:Method;
+    /**
+    * Stable request parameter of the API. (Optional)
+    */
+    stableParam?:any;
+  }
+  /**
+  * Default request config for each _Common Action_.
+  * Index corresponds to the order of enumeration.
+  */
+  export const CommonConfigs:ConfigStruct[] = [
+    {
+      path:'/PB2CAPIVAN/invapp/InvApp',
+      method:Method.POST,
+      stableParam:{
+        action:'QryWinningList',
+        version:0.2
+      }
+    },
+    {
+      path:'/PB2CAPIVAN/invapp/InvApp',
+      method:Method.POST,
+      stableParam:{
+        action:'qryInvHeader',
+        version:0.3,
+        generation:'V2'
+      }
+    },
+    {
+      path:'/PB2CAPIVAN/invapp/InvApp',
+      method:Method.POST,
+      stableParam:{
+        action:'qryInvDetail',
+        version:0.3,
+        generation:'V2'
+      }
+    },
+    {
+      path:'/PB2CAPIVAN/loveCodeapp/qryLoveCode',
+      method:Method.POST,
+      stableParam:{
+        action:'qryLoveCode',
+        version:0.2
+      }
+    },
+    {
+      path:'/PB2CAPIVAN/invServ/InvServ',
+      method:Method.POST,
+      stableParam:{
+        action:'carrierInvChk',
+        version:0.3
+      }
+    },
+    {
+      path:'/PB2CAPIVAN/invServ/InvServ',
+      method:Method.POST,
+      stableParam:{
+        action:'carrierInvDetail',
+        version:0.3
+      }
+    },
+    {
+      path:'/PB2CAPIVAN/CarInv/Donate',
+      method:Method.POST,
+      stableParam:{
+        action:'carrierInvDnt',
+        version:0.1
+      }
+    },
+    {
+      path:'/PB2CAPIVAN/Carrier/Aggregate',
+      method:Method.POST,
+      stableParam:{
+        action:'qryCarrierAgg',
+        version:1.0
+      }
+    },
+    {//.
+      path:'/PB2CAPIVAN/appCarreg/AppCarReg',
+      method:Method.POST,
+      stableParam:{
+        action:'generalCarrierReg',
+        version:1.0
+      }
+    },
+    {
+      path:'/PB2CAPIVAN/PublicCarrier/AppBankInfo',
+      method:Method.POST,
+      stableParam:{
+        action:'generalCarrierBank',
+        version:1.0
+      }
+    },
+    {
+      path:'/PB2CAPIVAN/Carrier/AppGetBarcode',
+      method:Method.POST,
+      stableParam:{
+        action:'getBarcode',
+        version:1.0
+      }
+    },
+    {
+      path:'/PB2CAPIVAN/MobBarCar/PubCarVerReg',
+      method:Method.POST,
+      stableParam:{
+        action:'pubCarVerReg',
+        version:1.0
+      }
+    },
+    {
+      path:'/PB2CAPIVAN/MobBarCar/ChangeVer',
+      method:Method.POST,
+      stableParam:{
+        action:'changeVer',
+        version:1.0
+      }
+    },
+    {
+      path:'/PB2CAPIVAN/MobBarCar/ForgetVer',
+      method:Method.POST,
+      stableParam:{
+        action:'forgetVer',
+        version:1.0
+      }
+    },
+    {
+      path:'/PB2CAPIVAN/MobBarCar/CarrierAction',
+      method:Method.POST,
+      stableParam:{
+        action:'carrierAction',
+        version:1.0
+      }
+    }
+  ];
+  /**
+  * Default request config for each _Business Action_.
+  * Index corresponds to the order of enumeration.
+  */
+  export const BusinessConfigs:ConfigStruct[] = [
+    {
+      endPoint:'http://www-vc.einvoice.nat.gov.tw',
+      path:'/BIZAPIVAN/biz',
+      method:Method.POST,
+      stableParam:{
+        action:'bcv',
+        version:1.0
+      }
+    },
+    {
+      endPoint:'http://www-vc.einvoice.nat.gov.tw',
+      path:'/BIZAPIVAN/biz',
+      method:Method.POST,
+      stableParam:{
+        action:'preserveCodeCheck',
+        version:1.0
+      }
+    },
+    {
+      endPoint:'https://einvoice.nat.gov.tw',
+      path:'/BIZAPIVAN/biz',
+      method:Method.POST,
+      stableParam:{
+        action:'cardBin',
+        version:1.0
+      }
+    },
+    {
+      endPoint:'https://einvoice.nat.gov.tw',
+      path:'/BIZAPIVAN/biz',
+      method:Method.POST,
+      stableParam:{
+        action:'creditCardBan',
+        version:1.0
+      }
+    },
+    {
+      endPoint:'http://www-vc.einvoice.nat.gov.tw',
+      path:'/BIZAPIVAN/biz',
+      method:Method.POST,
+      stableParam:{
+        action:'qryRecvRout',
+        version:1.0
+      }
+    },
+    {
+      endPoint:'http://www-vc.einvoice.nat.gov.tw',
+      path:'/BIZAPIVAN/biz',
+      method:Method.POST,
+      stableParam:{
+        action:'qryBanUnitTp',
+        version:1.0
+      }
+    }
+  ];
 }
