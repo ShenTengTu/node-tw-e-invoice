@@ -422,3 +422,56 @@ namespace APIRequest {
     }
   ];
 }
+/**
+* A module contains all utilities the API need.
+*/
+export namespace APIUtil{
+  /**
+  * Internal serial number generator Map. When `Serial` implement,the instance will register it's generator to here.
+  */
+  const SerialWMap : WeakMap<Serial , IterableIterator<string>>= new WeakMap();
+  /**
+  * Serial number generator factory.The `Serial` instance get it's generator from here.
+  */
+  function serialGenFactory():IterableIterator<string>{
+    return gen();
+
+    function* gen() {
+        let n = 0;
+        while(true){
+          n++;
+          yield n.toString().padStart(10,'0');
+        }
+    }
+  }
+  /**
+  * Serial number generator class.You can get new serial number or reset it.
+  */
+  export class Serial {
+    /**
+    * constructor
+    * The instance will register a serial number generator.
+    */
+    constructor(){
+      SerialWMap.set(this,serialGenFactory());
+    }
+    /**
+    * Return a new serial number.
+    */
+    next():string | undefined {
+      let serialGen = SerialWMap.get(this);
+      if(serialGen){
+        return serialGen.next().value;
+      }
+      return;
+    }
+    /**
+    * Register a new generator.
+    */
+    anew(){
+      SerialWMap.set(this,serialGenFactory());
+      return this;
+    }
+
+  }
+}

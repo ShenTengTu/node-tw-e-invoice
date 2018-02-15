@@ -22,6 +22,10 @@
   "homepage": "https://github.com/ShenTengTu/node-tw-e-invoice#readme",
   "devDependencies": {
     "@types/node": "^8.9.1",
+    "dotenv": "^5.0.0",
     "typescript": "^2.7.1"
+  },
+  "engines":{
+    "node" : ">=8.9.4"
   }
 }
