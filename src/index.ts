@@ -108,6 +108,27 @@ export enum InquirerIdentity {
   BusinessEntity
 }
 /**
+* Enumerate card type specified in the API.
+*/
+export enum CarrierCardType {
+  /**
+  * Mobile barcode
+  */
+  Mobile = '3J0002',
+  /**
+  * EasyCard
+  */
+  EasyCard = '1K0001',
+  /**
+  * iPASS
+  */
+  IPASS = '1H0001',
+  /**
+  * MOICA Citizen Digital Certificate
+  */
+  MOICACDC = 'CQ0001'
+}
+/**
 * Enumerate request parameter `action` literals specified in the API for common user.
 */
 enum RequestCommonAction {
