@@ -8,6 +8,17 @@ const endPoint: string = 'https://api.einvoice.nat.gov.tw';
  */
 export class TaiwanEInvoice {
   /**
+  * Sort request parameters by key in ascending order.
+  * Must use before `signature`.
+  * @param param unsort request parameters.
+  */
+  static paramSort(param:{[x:string]:string | number}) {
+    return Object.keys(param).sort().reduce((acc: any, k) => {
+      acc[k] = param[k];
+      return acc;
+    }, {});
+  }
+  /**
   * App ID,apply from [MOF E-Invoice platform](https://www.einvoice.nat.gov.tw/APMEMBERVAN/APIService/Registration).
   */
   appID:string;
@@ -96,6 +107,8 @@ export class TaiwanEInvoice {
     if(paramters.hasOwnProperty('UUID')) paramters.UUID = this.uuID;
     if(paramters.hasOwnProperty('uuid')) paramters.uuid = this.uuID;
     if(paramters.hasOwnProperty('TxID')) paramters.TxID = this.txID;
+
+    paramters = TaiwanEInvoice.paramSort(paramters);
 
     let url = `${config.endPoint}${config.path}?${querystring.stringify(paramters)}`
     console.log(config.method,url);
@@ -321,7 +334,7 @@ namespace APIRequest {
   * when condition schema
   */
   function sch_when(ref:string,opt:Joi.WhenOptions):Joi.AlternativesSchema{
-    return sch_when(ref,{is:opt.is, then:opt.otherwise, otherwise:Joi.forbidden()})
+    return Joi.alternatives().when(ref,{is:opt.is, then:opt.otherwise, otherwise:Joi.any().forbidden()})
   }
   /**s
   * Default request config for each _Common Action_.
@@ -668,7 +681,7 @@ namespace APIRequest {
         cardType:sch_cardType,
         carrierName:Joi.string().optional(),
         publicCardNo:Joi.string().required(),
-        publicCardType:Joi.valid(CarrierCardType.Mobile).required(),
+        publicCardType:Joi.string().valid(CarrierCardType.Mobile).required(),
         publicVerifyCode:Joi.string().required(),
         serial:sch_digits(10),
         timeStamp:Joi.date().timestamp('unix').required(),
