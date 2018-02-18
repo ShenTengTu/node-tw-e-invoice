@@ -1,4 +1,6 @@
 import * as querystring from 'querystring';
+import * as crypto from 'crypto';
+import * as Joi from 'joi';
 const endPoint: string = 'https://api.einvoice.nat.gov.tw';
 
 /**
@@ -62,7 +64,7 @@ export class TaiwanEInvoice {
   * @param action request parameter `action` literal specified in the API
   * @param param other request parameters specified in the API
   */
-  action(action:string,param:{}){
+  action(action:string,param:{[x:string]:string | number}){
     if(typeof param !== 'object')
       throw new Error('param must be specified an plain object.');
 
@@ -88,8 +90,13 @@ export class TaiwanEInvoice {
     let config:APIRequest.ConfigStruct = configs[actionIndex];
     config.endPoint = config.endPoint || endPoint;
     let paramters = { ...param, ...config.stableParam};
-    paramters.appID = this.appID;
-    paramters.UUID = this.uuID;
+
+    if(paramters.hasOwnProperty('appID')) paramters.appID = this.appID;
+    if(paramters.hasOwnProperty('appId')) paramters.appId = this.appID;
+    if(paramters.hasOwnProperty('UUID')) paramters.UUID = this.uuID;
+    if(paramters.hasOwnProperty('uuid')) paramters.uuid = this.uuID;
+    if(paramters.hasOwnProperty('TxID')) paramters.TxID = this.txID;
+
     let url = `${config.endPoint}${config.path}?${querystring.stringify(paramters)}`
     console.log(config.method,url);
   }
@@ -126,7 +133,11 @@ export enum CarrierCardType {
   /**
   * MOICA Citizen Digital Certificate
   */
-  MOICACDC = 'CQ0001'
+  MOICACDC = 'CQ0001',
+  /**
+  * icash
+  */
+  ICASH = '2G0001'
 }
 /**
 * Enumerate request parameter `action` literals specified in the API for common user.
@@ -250,11 +261,69 @@ namespace APIRequest {
     */
     method:Method;
     /**
-    * Stable request parameter of the API. (Optional)
+    * Need signature or not.
     */
-    stableParam?:any;
+    needToSign:boolean
+    /**
+    * Stable request parameter of the API.
+    */
+    stableParam:{[x:string]:string | number};
+    /**
+    *Schema of request parameters
+    */
+    schema:Joi.ObjectSchema
   }
   /**
+  * invTerm schema
+  */
+  const sch_invTerm = Joi.string().regex(/^[0-9]{5}$/, 'yyyMM').required();
+  /**
+  * invDate schema
+  */
+  const sch_invDate = Joi.string().regex(/^[0-9]{4}\/[0-9]{2}\/[0-9]{2}$/,'yyyy/MM/dd').required();
+  /**
+  * invNum schema
+  */
+  const sch_invNum = Joi.string().regex(/^[A-Z]{2}[0-9]{8}$/, '[A-Z]{2}[0-9]{8}').required();
+  /**
+  * bar code type schema
+  */
+  const sch_barcode = Joi.string().valid('QRCode', 'Barcode').required();
+  /**
+  * cardType schema
+  */
+  const sch_cardType = Joi.string().valid(
+    CarrierCardType.EasyCard,
+    CarrierCardType.ICASH,
+    CarrierCardType.IPASS,
+    CarrierCardType.MOICACDC,
+    CarrierCardType.Mobile).required();
+  /**
+  * Y/N schema
+  */
+  const sch_YN = Joi.string().valid('Y','N').required();
+  /**
+  * verify code (password) schema
+  */
+  const sch_verify = Joi.string().regex(/^(?=.*\d)(?=.*[a-zA-Z])([^'"+=?\\\/\s]){8,16}$/,'password').required();
+  /**
+  * digit string schema
+  */
+  function sch_digits (n?:number):Joi.StringSchema{
+    if(typeof n === 'number'){
+      let regex = new RegExp(`^[0-9]{${n}}$`);
+      return Joi.string().regex(regex, `${n} digits`).required();
+    }
+
+    return Joi.string().regex(/^[0-9]+$/, `only digits`).required();
+  }
+  /**
+  * when condition schema
+  */
+  function sch_when(ref:string,opt:Joi.WhenOptions):Joi.AlternativesSchema{
+    return sch_when(ref,{is:opt.is, then:opt.otherwise, otherwise:Joi.forbidden()})
+  }
+  /**s
   * Default request config for each _Common Action_.
   * Index corresponds to the order of enumeration.
   */
@@ -262,124 +331,351 @@ namespace APIRequest {
     {
       path:'/PB2CAPIVAN/invapp/InvApp',
       method:Method.POST,
+      needToSign:false,
       stableParam:{
         action:'QryWinningList',
-        version:0.2
-      }
+        version:0.2,
+        UUID:'',
+        appID:''
+      },
+      schema : Joi.object().keys({
+        UUID:Joi.string().required(),
+        action:Joi.string().required(),
+        appID:Joi.string().required(),
+        invTerm:sch_invTerm,
+        version:Joi.number().required()
+      })
     },
     {
       path:'/PB2CAPIVAN/invapp/InvApp',
       method:Method.POST,
+      needToSign:false,
       stableParam:{
         action:'qryInvHeader',
         version:0.3,
-        generation:'V2'
-      }
+        generation:'V2',
+        UUID:'',
+        appID:''
+      },
+      schema : Joi.object().keys({
+        UUID:Joi.string().required(),
+        action:Joi.string().required(),
+        appID:Joi.string().required(),
+        generation:Joi.string().required(),
+        invDate:sch_invDate,
+        invNum:sch_invNum,
+        type:sch_barcode,
+        version:Joi.number().required()
+      })
     },
     {
       path:'/PB2CAPIVAN/invapp/InvApp',
       method:Method.POST,
+      needToSign:false,
       stableParam:{
         action:'qryInvDetail',
         version:0.3,
-        generation:'V2'
-      }
+        generation:'V2',
+        UUID:'',
+        appID:''
+      },
+      schema : Joi.object().keys({
+        UUID:Joi.string().required(),
+        action:Joi.string().required(),
+        appID:Joi.string().required(),
+        encrypt:sch_when('type',{is:'QRCode', then:Joi.string().required()}),
+        generation:Joi.string().required(),
+        invDate:sch_invDate,
+        invNum:sch_invNum,
+        invTerm:sch_when('type',{is:'Barcode', then:sch_invTerm}),
+        randomNumber:sch_digits(4),
+        sellerID:sch_when('type',{is:'QRCode', then:sch_digits(8)}),
+        type:sch_barcode,
+        version:Joi.number().required()
+      })
     },
     {
       path:'/PB2CAPIVAN/loveCodeapp/qryLoveCode',
       method:Method.POST,
+      needToSign:false,
       stableParam:{
         action:'qryLoveCode',
-        version:0.2
-      }
+        version:0.2,
+        UUID:'',
+        appID:''
+      },
+      schema : Joi.object().keys({
+        UUID:Joi.string().required(),
+        action:Joi.string().required(),
+        appID:Joi.string().required(),
+        qKey:sch_digits(),
+        version:Joi.number().required()
+      })
     },
     {
       path:'/PB2CAPIVAN/invServ/InvServ',
       method:Method.POST,
+      needToSign:false,
       stableParam:{
         action:'carrierInvChk',
-        version:0.3
-      }
+        version:0.3,
+        uuid:'',
+        appID:''
+      },
+      schema : Joi.object().keys({
+        action:Joi.string().required(),
+        appID:Joi.string().required(),
+        cardEncrypt:Joi.string().required(),
+        cardNo:Joi.string().required(),
+        cardType:sch_cardType,
+        endDate:sch_invDate,
+        expTimeStamp:Joi.date().timestamp('unix').required(),
+        onlyWinningInv:sch_YN,
+        startDate:sch_invDate,
+        timeStamp:Joi.date().timestamp('unix').required(),
+        uuid:Joi.string().required(),
+        version:Joi.number().required()
+      })
     },
     {
       path:'/PB2CAPIVAN/invServ/InvServ',
       method:Method.POST,
+      needToSign:false,
       stableParam:{
         action:'carrierInvDetail',
-        version:0.3
-      }
+        version:0.3,
+        uuid:'',
+        appID:''
+      },
+      schema : Joi.object().keys({
+        action:Joi.string().required(),
+        amount:sch_digits(),
+        appID:Joi.string().required(),
+        cardEncrypt:Joi.string().required(),
+        cardNo:Joi.string().required(),
+        cardType:sch_cardType,
+        expTimeStamp:Joi.date().timestamp('unix').required(),
+        invDate:sch_invDate,
+        invNum:sch_invNum,
+        sellerName:Joi.string().optional(),
+        timeStamp:Joi.date().timestamp('unix').required(),
+        uuid:Joi.string().required(),
+        version:Joi.number().required()
+      })
     },
     {
       path:'/PB2CAPIVAN/CarInv/Donate',
       method:Method.POST,
+      needToSign:true,
       stableParam:{
         action:'carrierInvDnt',
-        version:0.1
-      }
+        version:0.1,
+        uuid:'',
+        appID:''
+      },
+      schema : Joi.object().keys({
+        action:Joi.string().required(),
+        appID:Joi.string().required(),
+        cardEncrypt:Joi.string().required(),
+        cardNo:Joi.string().required(),
+        cardType:sch_cardType,
+        expTimeStamp:Joi.date().timestamp('unix').required(),
+        invDate:sch_invDate,
+        invNum:sch_invNum,
+        npoBan:sch_digits(),
+        serial:sch_digits(10),
+        timeStamp:Joi.date().timestamp('unix').required(),
+        uuid:Joi.string().required(),
+        version:Joi.number().required()
+      })
     },
     {
       path:'/PB2CAPIVAN/Carrier/Aggregate',
       method:Method.POST,
+      needToSign:true,
       stableParam:{
         action:'qryCarrierAgg',
-        version:1.0
-      }
+        version:1.0,
+        uuid:'',
+        appID:''
+      },
+      schema : Joi.object().keys({
+        action:Joi.string().required(),
+        appID:Joi.string().required(),
+        cardEncrypt:Joi.string().required(),
+        cardNo:Joi.string().required(),
+        cardType:sch_cardType,
+        serial:sch_digits(10),
+        timeStamp:Joi.date().timestamp('unix').required(),
+        uuid:Joi.string().required(),
+        version:Joi.number().required()
+      })
     },
     {//.
       path:'/PB2CAPIVAN/appCarreg/AppCarReg',
       method:Method.POST,
+      needToSign:true,
       stableParam:{
         action:'generalCarrierReg',
-        version:1.0
-      }
+        version:1.0,
+        uuid:'',
+        appID:''
+      },
+      schema : Joi.object().keys({
+        action:Joi.string().required(),
+        appID:Joi.string().required(),
+        email:Joi.string().email().required(),
+        isVerification:sch_YN,
+        phoneNo:sch_digits(10),
+        serial:sch_digits(10),
+        timeStamp:Joi.date().timestamp('unix').required(),
+        uuid:Joi.string().required(),
+        version:Joi.number().required()
+      })
     },
     {
       path:'/PB2CAPIVAN/PublicCarrier/AppBankInfo',
       method:Method.POST,
+      needToSign:true,
       stableParam:{
         action:'generalCarrierBank',
-        version:1.0
-      }
+        version:1.0,
+        uuid:'',
+        appID:''
+      },
+      schema : Joi.object().keys({
+        accountNo:sch_when('updateAcc',{is:'Y',then:sch_digits()}),
+        action:Joi.string().required(),
+        appID:Joi.string().required(),
+        bankNo:sch_when('updateAcc',{is:'Y',then:sch_digits()}),
+        cardEncrypt:Joi.string().required(),
+        cardNo:Joi.string().required(),
+        cardType:sch_cardType,
+        enableRemit:sch_YN,
+        expTimeStamp:Joi.date().timestamp('unix').required(),
+        rocID:sch_when('updateAcc',{is:'Y',then:Joi.string().regex(/^[A-Z]{1}[0-9]{9}$/, 'ROC ID').required()}),
+        serial:sch_digits(10),
+        timeStamp:Joi.date().timestamp('unix').required(),
+        updateAcc:sch_YN,
+        userIdType:Joi.string().valid(['1','2']).required(),
+        uuid:Joi.string().required(),
+        version:Joi.number().required(),
+        winnerName:sch_when('updateAcc',{is:'Y',then:Joi.string().required()}),
+        winnerPhone:sch_when('updateAcc',{is:'Y',then:sch_digits(10)}),
+      })
     },
     {
       path:'/PB2CAPIVAN/Carrier/AppGetBarcode',
       method:Method.POST,
+      needToSign:false,
       stableParam:{
         action:'getBarcode',
-        version:1.0
-      }
+        version:1.0,
+        uuid:'',
+        appID:''
+      },
+      schema : Joi.object().keys({
+        action:Joi.string().required(),
+        appID:Joi.string().required(),
+        phoneNo:sch_digits(10),
+        timeStamp:Joi.date().timestamp('unix').required(),
+        uuid:Joi.string().required(),
+        verificationCode:Joi.string().required(),
+        version:Joi.number().required()
+      })
     },
     {
       path:'/PB2CAPIVAN/MobBarCar/PubCarVerReg',
       method:Method.POST,
+      needToSign:true,
       stableParam:{
         action:'pubCarVerReg',
-        version:1.0
-      }
+        version:1.0,
+        uuid:'',
+        appID:''
+      },
+      schema : Joi.object().keys({
+        action:Joi.string().required(),
+        appID:Joi.string().required(),
+        email:Joi.string().email().required(),
+        isVerification:sch_YN,
+        phoneNo:sch_digits(10),
+        serial:sch_digits(10),
+        timeStamp:Joi.date().timestamp('unix').required(),
+        uuid:Joi.string().required(),
+        verify:sch_verify,
+        version:Joi.number().required()
+      })
     },
     {
       path:'/PB2CAPIVAN/MobBarCar/ChangeVer',
       method:Method.POST,
+      needToSign:true,
       stableParam:{
         action:'changeVer',
-        version:1.0
-      }
+        version:1.0,
+        uuid:'',
+        appID:''
+      },
+      schema : Joi.object().keys({
+        action:Joi.string().required(),
+        appID:Joi.string().required(),
+        cardNo:Joi.string().required(),
+        newVerify:sch_verify,
+        oldVerify:Joi.string().required(),
+        serial:sch_digits(10),
+        timeStamp:Joi.date().timestamp('unix').required(),
+        uuid:Joi.string().required(),
+        version:Joi.number().required()
+      })
     },
     {
       path:'/PB2CAPIVAN/MobBarCar/ForgetVer',
       method:Method.POST,
+      needToSign:true,
       stableParam:{
         action:'forgetVer',
-        version:1.0
-      }
+        version:1.0,
+        uuid:'',
+        appID:''
+      },
+      schema : Joi.object().keys({
+        action:Joi.string().required(),
+        appID:Joi.string().required(),
+        email:Joi.string().email().required(),
+        phoneNo:sch_digits(10),
+        serial:sch_digits(10),
+        timeStamp:Joi.date().timestamp('unix').required(),
+        uuid:Joi.string().required(),
+        version:Joi.number().required()
+      })
     },
     {
       path:'/PB2CAPIVAN/MobBarCar/CarrierAction',
       method:Method.POST,
+      needToSign:true,
       stableParam:{
         action:'carrierAction',
-        version:1.0
-      }
+        version:1.0,
+        uuid:'',
+        appID:''
+      },
+      schema : Joi.object().keys({
+        action:Joi.string().required(),
+        appID:Joi.string().required(),
+        email:Joi.string().email().required(),
+        cardNo:Joi.string().required(),
+        cardType:sch_cardType,
+        carrierName:Joi.string().optional(),
+        publicCardNo:Joi.string().required(),
+        publicCardType:Joi.valid(CarrierCardType.Mobile).required(),
+        publicVerifyCode:Joi.string().required(),
+        serial:sch_digits(10),
+        timeStamp:Joi.date().timestamp('unix').required(),
+        uuid:Joi.string().required(),
+        verifyCode:Joi.string().required(),
+        version:Joi.number().required()
+      })
     }
   ];
   /**
@@ -391,55 +687,116 @@ namespace APIRequest {
       endPoint:'http://www-vc.einvoice.nat.gov.tw',
       path:'/BIZAPIVAN/biz',
       method:Method.POST,
+      needToSign:false,
       stableParam:{
         action:'bcv',
-        version:1.0
-      }
+        version:1.0,
+        TxID:'',
+        appId:''
+      },
+      schema : Joi.object().keys({
+        TxID:Joi.string().required(),
+        action:Joi.string().required(),
+        appID:Joi.string().required(),
+        barCode:Joi.string().required(),
+        version:Joi.number().required()
+      })
     },
     {
       endPoint:'http://www-vc.einvoice.nat.gov.tw',
       path:'/BIZAPIVAN/biz',
       method:Method.POST,
+      needToSign:false,
       stableParam:{
         action:'preserveCodeCheck',
-        version:1.0
-      }
+        version:1.0,
+        TxID:'',
+        appId:''
+      },
+      schema : Joi.object().keys({
+        TxID:Joi.string().required(),
+        action:Joi.string().required(),
+        appID:Joi.string().required(),
+        pCode:Joi.string().required(),
+        version:Joi.number().required()
+      })
     },
     {
       endPoint:'https://einvoice.nat.gov.tw',
       path:'/BIZAPIVAN/biz',
       method:Method.POST,
+      needToSign:false,
       stableParam:{
         action:'cardBin',
-        version:1.0
-      }
+        version:1.0,
+        TxID:'',
+        appId:''
+      },
+      schema : Joi.object().keys({
+        TxID:Joi.string().required(),
+        action:Joi.string().required(),
+        appID:Joi.string().required(),
+        bankNo:sch_digits(),
+        version:Joi.number().required()
+      })
     },
     {
       endPoint:'https://einvoice.nat.gov.tw',
       path:'/BIZAPIVAN/biz',
       method:Method.POST,
+      needToSign:false,
       stableParam:{
         action:'creditCardBan',
-        version:1.0
-      }
+        version:1.0,
+        TxID:'',
+        appId:''
+      },
+      schema : Joi.object().keys({
+        TxID:Joi.string().required(),
+        action:Joi.string().required(),
+        appID:Joi.string().required(),
+        version:Joi.number().required()
+      })
     },
     {
       endPoint:'http://www-vc.einvoice.nat.gov.tw',
       path:'/BIZAPIVAN/biz',
       method:Method.POST,
+      needToSign:true,
       stableParam:{
         action:'qryRecvRout',
-        version:1.0
-      }
+        version:1.0,
+        TxID:'',
+        appId:''
+      },
+      schema : Joi.object().keys({
+        TxID:Joi.string().required(),
+        action:Joi.string().required(),
+        appID:Joi.string().required(),
+        ban:sch_digits(8),
+        serial:sch_digits(10),
+        timeStamp:Joi.date().timestamp('unix').required(),
+        version:Joi.number().required()
+      })
     },
     {
       endPoint:'http://www-vc.einvoice.nat.gov.tw',
       path:'/BIZAPIVAN/biz',
       method:Method.POST,
+      needToSign:true,
       stableParam:{
         action:'qryBanUnitTp',
-        version:1.0
-      }
+        version:1.0,
+        appId:''
+      },
+      schema : Joi.object().keys({
+        action:Joi.string().required(),
+        appID:Joi.string().required(),
+        ban:sch_digits(8),
+        serial:sch_digits(10),
+        timeStamp:Joi.date().timestamp('unix').required(),
+        version:Joi.number().required()
+      })
     }
   ];
 }
