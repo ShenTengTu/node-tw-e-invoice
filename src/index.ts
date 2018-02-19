@@ -16,7 +16,7 @@ export class TaiwanEInvoice {
   * Must use before `signature`.
   * @param param unsort request parameters.
   */
-  static paramSort(param:{[x:string]:string | number}) {
+  static paramSort(param:APIRequest.DefinedParameter) {
     return Object.keys(param).sort().reduce((acc: any, k) => {
       acc[k] = param[k];
       return acc;
@@ -79,7 +79,7 @@ export class TaiwanEInvoice {
   * @param action request parameter `action` literal specified in the API
   * @param param other request parameters specified in the API
   */
-  action(action:string,param:{[x:string]:string | number}){
+  action(action:string,param:APIRequest.DefinedParameter){
     if(typeof param !== 'object')
       throw new Error('param must be specified an plain object.');
 
@@ -111,6 +111,7 @@ export class TaiwanEInvoice {
     if(paramters.hasOwnProperty('uuid')) paramters.uuid = this.uuID;
     if(paramters.hasOwnProperty('TxID')) paramters.TxID = this.txID;
 
+    //must sort for signature
     paramters = TaiwanEInvoice.paramSort(paramters);
 
     return new Promise((res,rej)=>{
@@ -270,13 +271,70 @@ enum RequestBusinessuAction{
 /**
 * Inner module.Define default request config with the API spec .
 */
-namespace APIRequest {
+export namespace APIRequest {
   /**
   * Enumerate HTTP request methods.
   */
   export enum Method {
     GET = 'GET',
     POST = 'POST'
+  }
+  /**
+  * All request parameters defined in the API.
+  */
+  export interface DefinedParameter {
+    [x:string]:any,
+    TxID?:string,
+    UUID?:string,
+    accountNo?:string,//Bank account (require if updateAcc = 'Y')
+    action?:string,
+    amount?:string,//Money amount (Optional)
+    appID?:string,
+    appId?:string,
+    ban?:string,//Business Administration Number
+    bankNo?:string,//SWIFT Code
+    cardEncrypt?:string,//Carrier Card or Mobile barcode password
+    cardNo?:string,//Carrier Card barcode
+    cardType?:CarrierCardType,//Carrier card type
+    carrierName?:string,//Custom carriere name
+    email?:string,//E-mail for register
+    enableRemit?:string,//Enable remittance or not
+    encrypt?:string,//Invoice Verification code (require if type = 'QRCode')
+    endDate?:string,//Query end time
+    expTimeStamp?:Date,//Expiration Unix time stamp
+    generation?:string,
+    invDate?:string,//Invoice Date (yyyy/MM/dd)
+    invNum?:string,//Invoice number
+    invTerm?:string,//Invoice Term (yyyMM)
+    isVerification?:string,//email is verified or not ('Y' | 'N')
+    newVerify?:string,//New Mobile barcode password (8-16 length,number & alphabet need)
+    npoBan?:string,//Non-profit organizations BAN
+    oldVerify?:string,//Old Mobile barcode password
+    onlyWinningInv?:string,//Only return the winning information ('Y' | 'N')
+    pCode?:string,//Non-profit organizations' Love Code
+    phoneNo?:string,//Moblie number
+    publicCardNo?:string,//Public carrier Card barcode
+    publicCardType?:CarrierCardType,//Public carrier Card type
+    publicVerifyCode?:string,//Public carrier Card password
+    qKey?:string,//Query keyword of Non-profit organizations
+    randomNumber?:string,//4 digit random code of invoice
+    rocID?:string,//R.O.C. ID number (require if updateAcc = 'Y')
+    sellerID?:string,//Business Administration Number (require if type = 'QRCode')
+    sellerName?:string,//Seller's name (Optional)
+    serial?:string,//Transfer serial number (10 digits)
+    signature?:string,//signature of query string
+    startDate?:string,//Query start time
+    timeStamp?:Date,//Transfer time stamp
+    type?:string,//Bar code type ('Barcode' | 'QRCode')
+    updateAcc?:string,//Upadte annotation
+    userIdType?:string,//identity, '1' = Citizen | '2' = Foreigner (require if updateAcc = 'Y')
+    uuid?:string,
+    verificationCode?:string,//Mobile barcode password
+    verify?:string,//Mobile barcode password (8-16 length,number & alphabet need.)
+    verifyCode?:string,//Carrier Card password
+    version:number
+    winnerName?:string,//Winner name (require if updateAcc = 'Y')
+    winnerPhone?:string//Winner phone (require if updateAcc = 'Y')
   }
   /**
   * Define default request config structure.
@@ -301,7 +359,7 @@ namespace APIRequest {
     /**
     * Stable request parameter of the API.
     */
-    stableParam:{[x:string]:string | number};
+    stableParam:APIRequest.DefinedParameter;
     /**
     *Schema of request parameters
     */
