@@ -1,7 +1,11 @@
 import * as querystring from 'querystring';
 import * as crypto from 'crypto';
 import * as Joi from 'joi';
-const endPoint: string = 'https://api.einvoice.nat.gov.tw';
+
+/**
+* Default endPoint
+*/
+const EndPoint: string = 'https://api.einvoice.nat.gov.tw';
 
 /**
  * `TaiwanEInvoice` is a class that wraps Taiwan e-invoice API.
@@ -99,9 +103,8 @@ export class TaiwanEInvoice {
       throw new Error(`Invalid request action '${action}'`);
 
     let config:APIRequest.ConfigStruct = configs[actionIndex];
-    config.endPoint = config.endPoint || endPoint;
-    let paramters = { ...param, ...config.stableParam};
 
+    let paramters = { ...param, ...config.stableParam};
     if(paramters.hasOwnProperty('appID')) paramters.appID = this.appID;
     if(paramters.hasOwnProperty('appId')) paramters.appId = this.appID;
     if(paramters.hasOwnProperty('UUID')) paramters.UUID = this.uuID;
@@ -110,8 +113,26 @@ export class TaiwanEInvoice {
 
     paramters = TaiwanEInvoice.paramSort(paramters);
 
-    let url = `${config.endPoint}${config.path}?${querystring.stringify(paramters)}`
-    console.log(config.method,url);
+    return new Promise((res,rej)=>{
+      let {value,error} = Joi.validate(paramters, config.schema,{convert:false});
+      if(error) rej(error);
+
+      let{endPoint,path,method,needToSign} = config;
+      endPoint = endPoint || EndPoint;
+
+      //Generate signature from query string.
+      if(needToSign){
+        let qstr = querystring.stringify(param,undefined,undefined,{
+          encodeURIComponent: querystring.unescape//must unescape
+        });
+        let hmac = crypto.createHmac('sha1', this.apiKey);//HNAC-SHA1
+        hmac.update(qstr);
+        value.signature =  hmac.digest('base64');
+      }
+
+      res({path:`${endPoint}${path}`,method:method,param:value});
+    });
+
   }
 }
 /**
@@ -336,7 +357,7 @@ namespace APIRequest {
   function sch_when(ref:string,opt:Joi.WhenOptions):Joi.AlternativesSchema{
     return Joi.alternatives().when(ref,{is:opt.is, then:opt.otherwise, otherwise:Joi.any().forbidden()})
   }
-  /**s
+  /**
   * Default request config for each _Common Action_.
   * Index corresponds to the order of enumeration.
   */
