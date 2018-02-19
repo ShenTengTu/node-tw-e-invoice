@@ -121,9 +121,13 @@ export class TaiwanEInvoice {
       let{endPoint,path,method,needToSign} = config;
       endPoint = endPoint || EndPoint;
 
+      //convert Date to unix time stamp
+      if(value.timeStamp instanceof Date)   value.timeStamp = Math.floor(value.timeStamp.getTime()/1000);
+      if(value.expTimeStamp instanceof Date)   value.expTimeStamp = Math.floor(value.expTimeStamp.getTime()/1000);
+
       //Generate signature from query string.
       if(needToSign){
-        let qstr = querystring.stringify(param,undefined,undefined,{
+        let qstr = querystring.stringify(value,undefined,undefined,{
           encodeURIComponent: querystring.unescape//must unescape
         });
         let hmac = crypto.createHmac('sha1', this.apiKey);//HNAC-SHA1
@@ -301,7 +305,7 @@ export namespace APIRequest {
     enableRemit?:string,//Enable remittance or not
     encrypt?:string,//Invoice Verification code (require if type = 'QRCode')
     endDate?:string,//Query end time
-    expTimeStamp?:Date,//Expiration Unix time stamp
+    expTimeStamp?:Date|number,//Expiration Unix time stamp
     generation?:string,
     invDate?:string,//Invoice Date (yyyy/MM/dd)
     invNum?:string,//Invoice number
@@ -324,7 +328,7 @@ export namespace APIRequest {
     serial?:string,//Transfer serial number (10 digits)
     signature?:string,//signature of query string
     startDate?:string,//Query start time
-    timeStamp?:Date,//Transfer time stamp
+    timeStamp?:Date|number,//Transfer time stamp
     type?:string,//Bar code type ('Barcode' | 'QRCode')
     updateAcc?:string,//Upadte annotation
     userIdType?:string,//identity, '1' = Citizen | '2' = Foreigner (require if updateAcc = 'Y')
