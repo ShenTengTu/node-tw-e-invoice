@@ -1,10 +1,11 @@
 {
-  "name": "tw-e-invoice",
+  "name": "node-tw-e-invoice",
   "version": "1.0.0",
-  "description": "Node.js framework of Taiwan e-invoice API. 台灣電子發票API的Node.js框架。",
+  "description": "An unofficial Node.js interface of Taiwan MOF E-Invoice API . 台灣財政部電子發票 API 的 非官方 Node.js 介面。",
   "main": "lib/index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "tsc": "tsc",
+    "typedoc": "typedoc --disableOutputCheck --theme minimal --out gh-pages src"
   },
   "repository": {
     "type": "git",
@@ -21,7 +22,15 @@
   },
   "homepage": "https://github.com/ShenTengTu/node-tw-e-invoice#readme",
   "devDependencies": {
+    "@types/joi": "^13.0.5",
     "@types/node": "^8.9.1",
+    "dotenv": "^5.0.0",
     "typescript": "^2.7.1"
+  },
+  "engines": {
+    "node": ">=8.9.4"
+  },
+  "dependencies": {
+    "joi": "^13.1.2"
   }
 }
