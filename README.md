@@ -1,3 +1,5 @@
+[![npm version](https://badge.fury.io/js/node-tw-e-invoice.svg)](https://badge.fury.io/js/node-tw-e-invoice)
+
 # node-tw-e-invoice
 An unofficial Node.js interface of Taiwan MOF E-Invoice API .
 台灣財政部電子發票 API 的 非官方 Node.js 介面。
@@ -54,7 +56,9 @@ EInvoice.inquirer(process.env.UUID,InquirerIdentity.Common)//Declare identity
 
 ## Documentation
 - Check out the [Using Guides](https://github.com/ShenTengTu/node-tw-e-invoice/wiki)
+  - https://github.com/ShenTengTu/node-tw-e-invoice/wiki
 - Check out the [API Doc](https://shentengtu.github.io/node-tw-e-invoice/)
+  - https://shentengtu.github.io/node-tw-e-invoice/
 
 ## Official specifications
 - [電子發票應用API規格 V1.5](https://www.einvoice.nat.gov.tw/home/DownLoad?fileName=1510206773173_0.pdf) :E-Invoice API Spec. `v1.5`
